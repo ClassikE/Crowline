@@ -542,9 +542,11 @@ function finish(){
   showResults(true);
 }
 
+function gameUrl(){ try { return /^https:/.test(location.href) && !/claude\.ai|claudeusercontent/.test(location.host) ? location.origin + location.pathname.replace(/index\.html$/,'') : ''; } catch(e){ return ''; } }
 function shareText(){
-  const tot = results.reduce((s,r)=>s+r.pts,0);
-  return `Crowline #${day+1} 🐦‍⬛ ${tot}/750\n${results.map(r=>emojiFor(r.err)).join('')}\n${results.map(r=>Math.round(r.err)+'°').join(' · ')}` + ((store.streak||0)>1 ? `\n🔥 ${store.streak}-day streak` : '');
+  const tot = results.reduce((s,r)=>s+r.pts,0), u = gameUrl();
+  const lines = results.map((r,i)=>`${emojiFor(r.err)} ${Math.round(r.err)}°`);
+  return `🧭 Crowline #${day+1}: ${tot}/750\n\n${lines.join('\n')}` + ((store.streak||0)>1 ? `\n\n🔥 ${store.streak}-day streak` : '') + (u ? `\n\n${u}` : '');
 }
 
 function resultsScene(){
@@ -586,18 +588,31 @@ $('btnCopy').onclick = async () => {
 // share image card
 let cardBlob = null;
 function makeCard(){
+  // spoiler- and location-free: one mini compass per round, target always at the top
   const w=1080, h=1350, c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext('2d');
   let g = x.createLinearGradient(0,0,0,h); g.addColorStop(0,'#0b1030'); g.addColorStop(1,'#03040b'); x.fillStyle=g; x.fillRect(0,0,w,h);
-  const r = rng(day+7); for (let i=0;i<500;i++){ x.globalAlpha=r()*.7+.1; x.fillStyle='#fff'; x.beginPath(); x.arc(r()*w,r()*h,r()*1.8+.3,0,7); x.fill(); } x.globalAlpha=1;
-  const sc2 = {...scene, center: ll(loc), R: 400, cy: .43, points: scene.points.map(p=>({...p, r:p.r*1.8, fs:26, pulse:false})), lines: scene.lines.map(l=>({...l, width:(l.width||2)*1.8}))};
-  drawGlobe(x, w, h, sc2, 1, 0);
-  x.setTransform(1,0,0,1,0,0); x.textAlign='center';
-  x.fillStyle='#fff'; x.font='700 76px "Space Grotesk",sans-serif'; x.fillText('CROWLINE', w/2, 120);
-  x.fillStyle='#8a93b8'; x.font='500 34px "JetBrains Mono",monospace'; x.fillText(`Daily #${day+1}`, w/2, 172);
+  const r = rng(day+7); for (let i=0;i<450;i++){ x.globalAlpha=r()*.6+.1; x.fillStyle='#fff'; x.beginPath(); x.arc(r()*w,r()*h,r()*1.8+.3,0,7); x.fill(); } x.globalAlpha=1;
+  x.textAlign='center';
+  x.font='700 84px "Space Grotesk",sans-serif'; { const a=x.measureText('CROW').width, b2=x.measureText('LINE').width, x0=w/2-(a+b2)/2; x.textAlign='left'; x.fillStyle='#fff'; x.fillText('CROW', x0, 140); x.fillStyle='#5ef2ff'; x.fillText('LINE', x0+a, 140); x.textAlign='center'; }
+  x.fillStyle='#8a93b8'; x.font='500 34px "JetBrains Mono",monospace'; x.fillText(`Daily #${day+1}`, w/2, 196);
   const tot = results.reduce((s,r)=>s+r.pts,0);
-  x.fillStyle='#5ef2ff'; x.shadowColor='#5ef2ff'; x.shadowBlur=30; x.font='700 120px "JetBrains Mono",monospace'; x.fillText(tot, w/2, 1150); x.shadowBlur=0;
-  x.fillStyle='#8a93b8'; x.font='500 36px "JetBrains Mono",monospace'; x.fillText('/ 750', w/2, 1200);
-  x.font='64px sans-serif'; x.fillText(results.map(r=>emojiFor(r.err)).join(' '), w/2, 1290);
+  x.fillStyle='#5ef2ff'; x.shadowColor='#5ef2ff'; x.shadowBlur=36; x.font='700 150px "JetBrains Mono",monospace'; x.fillText(tot, w/2, 380); x.shadowBlur=0;
+  x.fillStyle='#8a93b8'; x.font='500 38px "JetBrains Mono",monospace'; x.fillText('/ 750', w/2, 436);
+  const cols = {'🎯':'#5ef2ff','🟢':'#4ade80','🟡':'#facc15','🟠':'#fb923c','🔴':'#f87171'};
+  const pos = [[w*.2,640],[w*.5,640],[w*.8,640],[w*.35,1010],[w*.65,1010]], R=118;
+  results.forEach((res,i) => {
+    const [cx,cy] = pos[i], col = cols[emojiFor(res.err)], off = angDiff(res.tb, res.aim)*D2R;
+    x.fillStyle='rgba(18,26,68,.9)'; x.strokeStyle='rgba(94,242,255,.35)'; x.lineWidth=3; x.beginPath(); x.arc(cx,cy,R,0,7); x.fill(); x.stroke();
+    for (let d=0; d<360; d+=30){ const a=d*D2R; x.strokeStyle='rgba(201,210,255,.3)'; x.lineWidth=2; x.beginPath(); x.moveTo(cx+Math.sin(a)*(R-14),cy-Math.cos(a)*(R-14)); x.lineTo(cx+Math.sin(a)*(R-4),cy-Math.cos(a)*(R-4)); x.stroke(); }
+    x.fillStyle='#ffcc4d'; x.shadowColor='#ffcc4d'; x.shadowBlur=16; x.beginPath(); x.arc(cx, cy-R+30, 10, 0, 7); x.fill();
+    x.strokeStyle=col; x.shadowColor=col; x.shadowBlur=20; x.lineWidth=8; x.lineCap='round';
+    x.beginPath(); x.moveTo(cx,cy); x.lineTo(cx+Math.sin(off)*(R-38), cy-Math.cos(off)*(R-38)); x.stroke(); x.shadowBlur=0;
+    x.fillStyle='#fff'; x.beginPath(); x.arc(cx,cy,9,0,7); x.fill();
+    x.fillStyle='#fff'; x.font='700 40px "JetBrains Mono",monospace'; x.fillText(`${Math.round(res.err)}°`, cx, cy+R+56);
+    x.fillStyle='#8a93b8'; x.font='500 26px "Space Grotesk",sans-serif'; x.fillText(`Round ${i+1}`, cx, cy-R-22);
+  });
+  const u = gameUrl().replace(/^https:\/\//,'').replace(/\/$/,'');
+  x.fillStyle='#8a93b8'; x.font='500 30px "Space Grotesk",sans-serif'; x.fillText(u ? `Play at ${u}` : 'Point the way, as the crow flies.', w/2, 1290);
   return new Promise(res => c.toBlob(b => res(b), 'image/png'));
 }
 $('btnImg').onclick = async () => {
